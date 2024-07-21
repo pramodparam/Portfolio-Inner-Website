@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import colors from '../../constants/colors';
 import twitterIcon from '../../assets/pictures/contact-twitter.png';
 import ghIcon from '../../assets/pictures/contact-gh.png';
 import inIcon from '../../assets/pictures/contact-in.png';
-import { useRef } from 'react';
-// import emailjs from '@emailjs/browser';
+import emailjs from '@emailjs/browser';
 import ResumeDownload from './ResumeDownload';
 
 export interface ContactProps {}
@@ -12,7 +11,6 @@ export interface ContactProps {}
 // function to validate email
 const validateEmail = (email: string) => {
     const re =
-        // eslint-disable-next-line
         /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
     return re.test(String(email).toLowerCase());
 };
@@ -41,8 +39,12 @@ const Contact: React.FC<ContactProps> = (props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [formMessage, setFormMessage] = useState('');
     const [formMessageColor, setFormMessageColor] = useState('');
-    const [open, setOpen] = React.useState(false);
-    const form = useRef();
+    const form = useRef<HTMLFormElement>(null);
+
+    useEffect(() => {
+        emailjs.init("I369jGAHngFX3gI2k");
+    }, []);
+
     useEffect(() => {
         if (validateEmail(email) && name.length > 0 && message.length > 0) {
             setIsFormValid(true);
@@ -51,62 +53,41 @@ const Contact: React.FC<ContactProps> = (props) => {
         }
     }, [email, name, message]);
 
-    async function submitForm() {
+    async function submitForm(e: React.FormEvent) {
+        e.preventDefault();
         if (!isFormValid) {
             setFormMessage('Form unable to validate, please try again.');
             setFormMessageColor('red');
             return;
         }
+        if (form.current === null) {
+            setFormMessage('Form reference is not set. Please try again.');
+            setFormMessageColor('red');
+            return;
+        }
         try {
-            // emailjs.sendForm('gmail', 'template_z2wsmqk', form.current,'I369jGAHngFX3gI2k')
-            // .then((result) => {
-            //   setOpen(true);
-            //   form.current.reset();
-            // }, (error) => {
-            //   console.log(error.text);
-            // });
-            
             setIsLoading(true);
-            const res = await fetch(
-                'https://api.henryheffernan.com/api/contact',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        company,
-                        email,
-                        name,
-                        message,
-                    }),
-                }
+
+            // Send email using EmailJS
+            const result = await emailjs.sendForm(
+                'gmail', 'template_z2wsmqk', form.current, 'I369jGAHngFX3gI2k'
             );
-            // the response will be either {success: true} or {success: false, error: message}
-            const data = (await res.json()) as
-                | {
-                      success: false;
-                      error: string;
-                  }
-                | { success: true };
-            if (data.success) {
+
+            if (result.text === 'OK') {
                 setFormMessage(`Message successfully sent. Thank you ${name}!`);
                 setCompany('');
                 setEmail('');
                 setName('');
                 setMessage('');
                 setFormMessageColor(colors.blue);
-                setIsLoading(false);
             } else {
-                setFormMessage(data.error);
-                setFormMessageColor(colors.red);
-                setIsLoading(false);
+                throw new Error('Failed to send email');
             }
-        } catch (e) {
-            setFormMessage(
-                'There was an error sending your message. Please try again.'
-            );
+        } catch (error) {
+            console.error('Error sending email:', error);
+            setFormMessage('There was an error sending your message. Please try again.');
             setFormMessageColor(colors.red);
+        } finally {
             setIsLoading(false);
         }
     }
@@ -133,10 +114,6 @@ const Contact: React.FC<ContactProps> = (props) => {
                         icon={inIcon}
                         link={'https://www.linkedin.com/in/pramodr0912/'}
                     />
-                    {/* <SocialBox
-                        icon={twitterIcon}
-                        link={'https://twitter.com/henryheffernan'}
-                    /> */}
                 </div>
             </div>
             <div className="text-block">
@@ -154,7 +131,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                     </a>
                 </p>
 
-                <div style={styles.form}>
+                <form ref={form} style={styles.form} onSubmit={submitForm}>
                     <label>
                         <p>
                             {!name && <span style={styles.star}>*</span>}
@@ -164,7 +141,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                     <input
                         style={styles.formItem}
                         type="text"
-                        name="name"
+                        name="user_name" // Update name attribute
                         placeholder="Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
@@ -180,7 +157,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                     <input
                         style={styles.formItem}
                         type="email"
-                        name="email"
+                        name="user_email" // Update name attribute
                         placeholder="Email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -192,8 +169,8 @@ const Contact: React.FC<ContactProps> = (props) => {
                     </label>
                     <input
                         style={styles.formItem}
-                        type="company"
-                        name="company"
+                        type="text"
+                        name="user_company" // Update name attribute
                         placeholder="Company"
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
@@ -205,7 +182,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                         </p>
                     </label>
                     <textarea
-                        name="message"
+                        name="message" // Keep this name attribute
                         placeholder="Message"
                         style={styles.formItem}
                         value={message}
@@ -217,7 +194,6 @@ const Contact: React.FC<ContactProps> = (props) => {
                             style={styles.button}
                             type="submit"
                             disabled={!isFormValid || isLoading}
-                            onMouseDown={submitForm}
                         >
                             {!isLoading ? (
                                 'Send Message'
@@ -254,7 +230,7 @@ const Contact: React.FC<ContactProps> = (props) => {
                             </p>
                         </div>
                     </div>
-                </div>
+                </form>
             </div>
             <ResumeDownload altText="Need a copy of my Resume?" />
         </div>
@@ -280,7 +256,6 @@ const styles: StyleSheetCSS = {
     },
     formInfo: {
         textAlign: 'right',
-
         flexDirection: 'column',
         alignItems: 'flex-end',
         paddingLeft: 24,
@@ -304,8 +279,6 @@ const styles: StyleSheetCSS = {
     social: {
         width: 4,
         height: 4,
-        // borderRadius: 1000,
-
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,
